@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import DifficultyBadge from '@/components/DifficultyBadge';
 import ProfileCard from '@/components/ProfileCard';
 import { cn } from '@/lib/utils';
-import type { AppStatus } from '@/types';
+import type { AppStatus, Player, Recruitment } from '@/types';
 
 const STATUS_MAP: Record<string, string> = {
   '招募中': 'bg-amber/20 text-amber border-amber/30',
@@ -18,6 +18,96 @@ const APP_STATUS_MAP: Record<AppStatus, string> = {
   '已确认': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   '已婉拒': 'bg-crimson/20 text-crimson-light border-crimson/30',
 };
+
+function MatchReference({ player, recruitment }: { player: Player; recruitment: Recruitment }) {
+  return (
+    <div className="mt-3">
+      <div className="mb-2 text-xs font-medium tracking-wider text-smoke uppercase">匹配参考</div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">本型偏好</p>
+          <div className="flex flex-wrap gap-1">
+            {player.favoriteTypes.map((t) => (
+              <span
+                key={t}
+                className="rounded-md bg-amber/15 px-1.5 py-0.5 text-[11px] text-amber-light border border-amber/25"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">剧本难度</p>
+          <DifficultyBadge difficulty={recruitment.difficulty} />
+        </div>
+
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">可接受时长</p>
+          <div className="flex items-center gap-1 text-sm text-ghost/80">
+            <Clock className="h-3.5 w-3.5 text-amber" />
+            <span>{player.acceptableDuration}</span>
+          </div>
+        </div>
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">人数要求</p>
+          <span className="text-sm text-ghost/80">
+            {recruitment.currentPlayers}/{recruitment.totalPlayers} 人
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">笔记习惯</p>
+          <span className={cn(
+            'text-sm',
+            player.willingToTakeNotes ? 'text-amber-light' : 'text-smoke'
+          )}>
+            {player.willingToTakeNotes ? '✓ 记笔记' : '✗ 不记笔记'}
+          </span>
+        </div>
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">要求速读</p>
+          <span className={cn(
+            'text-sm',
+            recruitment.requireFastReading ? 'text-amber-light' : 'text-smoke'
+          )}>
+            {recruitment.requireFastReading ? '✓' : '✗'}
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">复盘习惯</p>
+          <span className="text-sm text-ghost/80">{player.reviewHabit}</span>
+        </div>
+        <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3">
+          <p className="mb-1.5 text-[11px] text-ghost-dim">接受替补</p>
+          <span className={cn(
+            'text-sm',
+            recruitment.acceptSubstitute ? 'text-amber-light' : 'text-smoke'
+          )}>
+            {recruitment.acceptSubstitute ? '✓' : '✗'}
+          </span>
+        </div>
+
+        {player.redFlags.length > 0 && (
+          <div className="rounded-lg border border-noir-light/30 bg-noir-light/20 p-3 sm:col-span-2">
+            <p className="mb-1.5 text-[11px] text-ghost-dim">雷区</p>
+            <div className="flex flex-wrap gap-1">
+              {player.redFlags.map((f) => (
+                <span
+                  key={f}
+                  className="rounded-md bg-crimson/20 px-1.5 py-0.5 text-[11px] text-crimson-light border border-crimson/30"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RecruitDetail() {
   const { id } = useParams<{ id: string }>();
@@ -170,7 +260,9 @@ export default function RecruitDetail() {
                       className="rounded-lg border border-noir-light/30 bg-noir-surface/60 p-4 backdrop-blur-sm"
                     >
                       <ProfileCard player={player} />
-                      <p className="mt-2 text-sm text-ghost/60">{app.selfIntroduction}</p>
+                      <MatchReference player={player} recruitment={recruitment} />
+                      <div className="my-3 border-t border-noir-light/30" />
+                      <p className="text-sm text-ghost/60">{app.selfIntroduction}</p>
                       {reviewed ? (
                         <div className="mt-3">
                           <span

@@ -9,6 +9,12 @@ const BORDER_COLORS: Record<Difficulty, string> = {
   '地狱': 'border-l-red-500',
 }
 
+const STATUS_MAP: Record<string, string> = {
+  '招募中': 'bg-amber/20 text-amber border-amber/30',
+  '已满员': 'bg-smoke/20 text-smoke border-smoke/30',
+  '已截止': 'bg-ghost-dim/20 text-ghost-dim border-ghost-dim/30',
+}
+
 interface TeamCardProps {
   recruitment: Recruitment
   organizer: Player
@@ -16,7 +22,7 @@ interface TeamCardProps {
 }
 
 export default function TeamCard({ recruitment, organizer, className }: TeamCardProps) {
-  const missingCount = recruitment.missingRoles.length
+  const remaining = Math.max(0, recruitment.totalPlayers - recruitment.currentPlayers)
 
   return (
     <div
@@ -26,22 +32,33 @@ export default function TeamCard({ recruitment, organizer, className }: TeamCard
         className,
       )}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
+      <div className="mb-3 flex items-start justify-between gap-2">
         <h3 className="font-display text-base font-bold text-ghost">
           {recruitment.scriptName}
         </h3>
         <DifficultyBadge difficulty={recruitment.difficulty} />
       </div>
 
-      <div className="mb-2 flex items-center gap-4 text-sm text-ghost-dim">
-        <span className="flex items-center gap-1">
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="flex items-center gap-1 text-ghost-dim">
           <Users size={14} className="text-amber/70" />
-          <span>缺{missingCount}人</span>
+          <span>{recruitment.currentPlayers}/{recruitment.totalPlayers}人</span>
         </span>
-        <span className="flex items-center gap-1">
-          <Clock size={14} className="text-amber/70" />
-          <span>{recruitment.driveTime}</span>
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-xs',
+            remaining > 0
+              ? 'bg-amber/20 text-amber-light'
+              : 'bg-smoke/20 text-smoke',
+          )}
+        >
+          {remaining > 0 ? `缺${remaining}位` : '已满'}
         </span>
+      </div>
+
+      <div className="mb-2 flex items-center gap-1 text-sm text-ghost-dim">
+        <Clock size={14} className="text-amber/70" />
+        <span>{recruitment.driveTime}</span>
       </div>
 
       <div className="mb-3 flex items-center gap-1 text-sm text-ghost-dim">
@@ -57,7 +74,14 @@ export default function TeamCard({ recruitment, organizer, className }: TeamCard
           <span className="text-sm text-ghost-dim">{organizer.nickname}</span>
         </div>
         {recruitment.status !== '招募中' && (
-          <span className="text-xs text-smoke">{recruitment.status}</span>
+          <span
+            className={cn(
+              'rounded-md border px-2 py-0.5 text-xs',
+              STATUS_MAP[recruitment.status] || 'bg-smoke/20 text-smoke border-smoke/30',
+            )}
+          >
+            {recruitment.status}
+          </span>
         )}
       </div>
     </div>

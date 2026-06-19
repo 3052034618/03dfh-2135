@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import TagSelector from '@/components/TagSelector'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 
 export default function ProfileEdit() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentPlayer, updateProfile } = useAppStore()
 
   const [nickname, setNickname] = useState(currentPlayer?.nickname ?? '')
@@ -31,13 +32,17 @@ export default function ProfileEdit() {
       reviewHabit,
       redFlags,
     })
-    navigate('/profile')
+    if (location.state?.from) {
+      navigate(location.state.from)
+    } else {
+      navigate('/profile')
+    }
   }
 
   return (
     <div className="min-h-screen bg-noir">
       <header className="glass sticky top-0 z-40 flex items-center gap-3 px-4 py-3">
-        <button onClick={() => navigate(-1)} className="text-ghost-dim hover:text-ghost transition-colors">
+        <button onClick={() => location.state?.from ? navigate(location.state.from) : navigate(-1)} className="text-ghost-dim hover:text-ghost transition-colors">
           <ArrowLeft size={22} />
         </button>
         <h1 className="font-display text-lg text-amber">推理档案</h1>
