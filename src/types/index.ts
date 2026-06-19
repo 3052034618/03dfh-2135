@@ -37,7 +37,23 @@ export interface Application {
   playerId: string;
   selfIntroduction: string;
   status: AppStatus;
+  remark?: string;
+  contacted?: boolean;
+  isSubstitute?: boolean;
   createdAt: string;
+}
+
+export interface CreateDraft {
+  scriptName: string;
+  difficulty: Difficulty;
+  totalPlayers: number;
+  currentPlayers: number;
+  store: string;
+  driveTime: string;
+  missingRoles: string[];
+  requireFastReading: boolean;
+  acceptSubstitute: boolean;
+  description: string;
 }
 
 export const FAVORITE_TYPES = ['硬核推理', '机制阵营', '还原推凶', '变格诡计', '本格密室', '情感沉浸', '恐怖演绎'] as const;

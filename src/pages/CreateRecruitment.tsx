@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, FileText } from 'lucide-react';
@@ -8,8 +8,11 @@ import { ROLES, DIFFICULTIES, type Difficulty } from '@/types';
 
 export default function CreateRecruitment() {
   const navigate = useNavigate();
+  const location = useLocation();
   const currentPlayer = useAppStore((s) => s.currentPlayer);
   const createRecruitment = useAppStore((s) => s.createRecruitment);
+  const createDraft = useAppStore((s) => s.createDraft);
+  const setCreateDraft = useAppStore((s) => s.setCreateDraft);
 
   const [scriptName, setScriptName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('进阶');
@@ -21,6 +24,22 @@ export default function CreateRecruitment() {
   const [requireFastReading, setRequireFastReading] = useState(false);
   const [acceptSubstitute, setAcceptSubstitute] = useState(false);
   const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (createDraft) {
+      setScriptName(createDraft.scriptName);
+      setDifficulty(createDraft.difficulty);
+      setTotalPlayers(createDraft.totalPlayers);
+      setCurrentPlayers(createDraft.currentPlayers);
+      setStore(createDraft.store);
+      setDriveTime(createDraft.driveTime);
+      setMissingRoles(createDraft.missingRoles);
+      setRequireFastReading(createDraft.requireFastReading);
+      setAcceptSubstitute(createDraft.acceptSubstitute);
+      setDescription(createDraft.description);
+      setCreateDraft(null);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +80,26 @@ export default function CreateRecruitment() {
           <p className="mb-6 text-sm text-ghost-dim">
             作为车头需要先完善个人档案，让队友了解你的推理风格
           </p>
-          <Link
-            to="/profile/edit"
+          <button
+            onClick={() => {
+              setCreateDraft({
+                scriptName,
+                difficulty,
+                totalPlayers,
+                currentPlayers,
+                store,
+                driveTime,
+                missingRoles,
+                requireFastReading,
+                acceptSubstitute,
+                description,
+              });
+              navigate('/profile/edit', { state: { from: location.pathname } });
+            }}
             className="inline-flex items-center justify-center rounded-lg bg-amber px-8 py-3 text-sm font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
           >
             去创建档案
-          </Link>
+          </button>
         </div>
       </div>
     );

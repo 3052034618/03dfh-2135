@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Player, Recruitment, Application, Difficulty } from '@/types';
+import type { Player, Recruitment, Application, Difficulty, CreateDraft } from '@/types';
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -187,12 +187,17 @@ interface AppStore {
   recruitments: Recruitment[];
   applications: Application[];
   players: Player[];
+  createDraft: CreateDraft | null;
 
   updateProfile: (data: Partial<Player>) => void;
   createRecruitment: (data: Omit<Recruitment, 'id' | 'createdAt' | 'organizerId'>) => void;
   updateRecruitmentStatus: (id: string, status: Recruitment['status']) => void;
   submitApplication: (recruitmentId: string, selfIntroduction: string) => void;
-  reviewApplication: (id: string, status: '已确认' | '已婉拒') => void;
+  reviewApplication: (id: string, status: '已确认' | '已婉拒', remark?: string) => void;
+  cancelConfirm: (id: string) => void;
+  toggleContacted: (id: string) => void;
+  toggleSubstitute: (id: string) => void;
+  setRemark: (id: string, remark: string) => void;
   getRecruitmentById: (id: string) => Recruitment | undefined;
   getApplicationsByRecruitment: (recruitmentId: string) => Application[];
   getPlayerById: (id: string) => Player | undefined;
@@ -200,6 +205,21 @@ interface AppStore {
   getMyRecruitments: () => Recruitment[];
   hasApplied: (recruitmentId: string) => boolean;
   filterRecruitments: (filters: { difficulty?: Difficulty; type?: string; status?: string }) => Recruitment[];
+  setCreateDraft: (draft: CreateDraft | null) => void;
+}
+
+function recalcRecruitment(recruitments: Recruitment[], applications: Application[], recruitmentId: string): Recruitment[] {
+  return recruitments.map((r) => {
+    if (r.id !== recruitmentId) return r;
+    const confirmedCount = applications.filter(
+      (a) => a.recruitmentId === recruitmentId && a.status === '已确认' && !a.isSubstitute
+    ).length;
+    return {
+      ...r,
+      currentPlayers: confirmedCount,
+      status: confirmedCount >= r.totalPlayers ? '已满员' : (r.status === '已截止' ? '已截止' : '招募中'),
+    };
+  });
 }
 
 export const useAppStore = create<AppStore>()(
@@ -209,6 +229,7 @@ export const useAppStore = create<AppStore>()(
       recruitments: MOCK_RECRUITMENTS,
       applications: MOCK_APPLICATIONS,
       players: MOCK_PLAYERS,
+      createDraft: null,
 
       updateProfile: (data) => {
         set((state) => {
@@ -249,6 +270,7 @@ export const useAppStore = create<AppStore>()(
         };
         set((s) => ({
           recruitments: [newRec, ...s.recruitments],
+          createDraft: null,
         }));
       },
 
@@ -275,23 +297,62 @@ export const useAppStore = create<AppStore>()(
         }));
       },
 
-      reviewApplication: (id, status) => {
+      reviewApplication: (id, status, remark) => {
+        set((state) => {
+          const updatedApps = state.applications.map((a) =>
+            a.id === id ? { ...a, status, remark: remark || a.remark, isSubstitute: false } : a
+          );
+          const app = state.applications.find((a) => a.id === id);
+          if (!app) return { applications: updatedApps };
+          return {
+            applications: updatedApps,
+            recruitments: recalcRecruitment(state.recruitments, updatedApps, app.recruitmentId),
+          };
+        });
+      },
+
+      cancelConfirm: (id) => {
+        set((state) => {
+          const updatedApps: Application[] = state.applications.map((a) =>
+            a.id === id ? { ...a, status: '待审核' as const, isSubstitute: false } : a
+          );
+          const app = state.applications.find((a) => a.id === id);
+          if (!app) return { applications: updatedApps };
+          return {
+            applications: updatedApps,
+            recruitments: recalcRecruitment(state.recruitments, updatedApps, app.recruitmentId),
+          };
+        });
+      },
+
+      toggleContacted: (id) => {
         set((state) => ({
-          applications: state.applications.map((a) => (a.id === id ? { ...a, status } : a)),
-          recruitments: status === '已确认'
-            ? state.recruitments.map((r) => {
-                const app = state.applications.find((a) => a.id === id);
-                if (app && r.id === app.recruitmentId) {
-                  const newCurrent = r.currentPlayers + 1;
-                  return {
-                    ...r,
-                    currentPlayers: newCurrent,
-                    status: newCurrent >= r.totalPlayers ? '已满员' : r.status,
-                  };
-                }
-                return r;
-              })
-            : state.recruitments,
+          applications: state.applications.map((a) =>
+            a.id === id ? { ...a, contacted: !a.contacted } : a
+          ),
+        }));
+      },
+
+      toggleSubstitute: (id) => {
+        set((state) => {
+          const app = state.applications.find((a) => a.id === id);
+          if (!app) return state;
+          const wasSub = !!app.isSubstitute;
+          const updatedApps = state.applications.map((a) =>
+            a.id === id ? { ...a, isSubstitute: !wasSub } : a
+          );
+          return {
+            applications: updatedApps,
+            recruitments: recalcRecruitment(state.recruitments, updatedApps, app.recruitmentId),
+          };
+        });
+      },
+
+      setRemark: (id, remark) => {
+        set((state) => ({
+          applications: state.applications.map((a) =>
+            a.id === id ? { ...a, remark } : a
+          ),
         }));
       },
 
@@ -330,6 +391,10 @@ export const useAppStore = create<AppStore>()(
           if (status && r.status !== status) return false;
           return true;
         });
+      },
+
+      setCreateDraft: (draft) => {
+        set({ createDraft: draft });
       },
     }),
     {

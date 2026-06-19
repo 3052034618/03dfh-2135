@@ -2,15 +2,27 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
-import { FileText, Car, Clock, MapPin } from 'lucide-react';
+import { FileText, Car, Clock, MapPin, ChevronDown } from 'lucide-react';
 import ProfileCard from '@/components/ProfileCard';
 import DifficultyBadge from '@/components/DifficultyBadge';
-import type { AppStatus } from '@/types';
+import type { AppStatus, Application } from '@/types';
 
 const APP_STATUS_STYLES: Record<AppStatus, string> = {
   '待审核': 'bg-amber/20 text-amber-light border-amber/30',
-  '已确认': 'bg-green-900/30 text-green-400 border-green-800/40',
-  '已婉拒': 'bg-red-900/30 text-red-400 border-red-800/40',
+  '已确认': 'bg-emerald-900/30 text-emerald-400 border-emerald-800/40',
+  '已婉拒': 'bg-crimson/20 text-crimson-light border-crimson/30',
+};
+
+const BADGE = {
+  pending: 'border-amber/30 bg-amber/20 text-amber-light',
+  confirmed: 'border-emerald-700/40 bg-emerald-900/30 text-emerald-400',
+  rejected: 'border-crimson/30 bg-crimson/20 text-crimson-light',
+  full: 'border-smoke/30 bg-smoke/20 text-smoke',
+  groupPending: 'border-amber/30 bg-amber/10 text-amber-light',
+  groupConfirmed: 'border-emerald-700/40 bg-emerald-900/20 text-emerald-400',
+  groupRejected: 'border-crimson/30 bg-crimson/10 text-crimson-light',
+  contacted: 'border-emerald-700/40 bg-emerald-900/30 text-emerald-400',
+  sub: 'border-amber/30 bg-amber/20 text-amber-light',
 };
 
 export default function Profile() {
@@ -20,52 +32,39 @@ export default function Profile() {
   const getMyApplications = useAppStore((s) => s.getMyApplications);
   const getRecruitmentById = useAppStore((s) => s.getRecruitmentById);
   const getApplicationsByRecruitment = useAppStore((s) => s.getApplicationsByRecruitment);
-
-  const myRecruitments = getMyRecruitments();
-  const myApplications = getMyApplications();
+  const getPlayerById = useAppStore((s) => s.getPlayerById);
 
   return (
     <div className="min-h-screen bg-noir pb-20">
       <div className="flex gap-2 p-4">
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={cn(
-            'flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-colors',
-            activeTab === 'profile'
-              ? 'bg-amber text-noir'
-              : 'bg-smoke/50 text-ghost-dim hover:bg-smoke/70'
-          )}
-        >
-          <FileText size={16} />
-          我的档案
-        </button>
-        <button
-          onClick={() => setActiveTab('team')}
-          className={cn(
-            'flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-colors',
-            activeTab === 'team'
-              ? 'bg-amber text-noir'
-              : 'bg-smoke/50 text-ghost-dim hover:bg-smoke/70'
-          )}
-        >
-          <Car size={16} />
-          我的车队
-        </button>
+        <TabButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={FileText} label="我的档案" />
+        <TabButton active={activeTab === 'team'} onClick={() => setActiveTab('team')} icon={Car} label="我的车队" />
       </div>
-
       <div className="px-4">
         {activeTab === 'profile' ? (
           <ProfileTab currentPlayer={currentPlayer} />
         ) : (
           <TeamTab
-            myRecruitments={myRecruitments}
-            myApplications={myApplications}
+            myRecruitments={getMyRecruitments()}
+            myApplications={getMyApplications()}
             getRecruitmentById={getRecruitmentById}
             getApplicationsByRecruitment={getApplicationsByRecruitment}
+            getPlayerById={getPlayerById}
           />
         )}
       </div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: any; label: string }) {
+  return (
+    <button onClick={onClick} className={cn(
+      'flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-colors',
+      active ? 'bg-amber text-noir' : 'bg-smoke/50 text-ghost-dim hover:bg-smoke/70'
+    )}>
+      <Icon size={16} />{label}
+    </button>
   );
 }
 
@@ -75,90 +74,76 @@ function ProfileTab({ currentPlayer }: { currentPlayer: ReturnType<typeof useApp
       <div className="mt-12 flex flex-col items-center gap-6 rounded-xl border border-ghost-dim/20 bg-noir-surface p-8">
         <div className="text-6xl opacity-40">🕵️</div>
         <p className="text-lg text-ghost-dim">尚未创建档案</p>
-        <Link
-          to="/profile/edit"
-          className="rounded-lg bg-amber px-8 py-2.5 font-medium text-noir transition-colors hover:bg-amber-dark"
-        >
-          创建档案
-        </Link>
+        <Link to="/profile/edit" className="rounded-lg bg-amber px-8 py-2.5 font-medium text-noir transition-colors hover:bg-amber-dark">创建档案</Link>
       </div>
     );
   }
-
   return (
     <div className="mt-2 flex flex-col gap-4">
       <ProfileCard player={currentPlayer} />
-      <Link
-        to="/profile/edit"
-        className="self-center rounded-lg border border-ghost-dim/30 px-6 py-2 text-sm text-ghost-dim transition-colors hover:border-ghost-dim/60 hover:text-ghost"
-      >
-        编辑档案
-      </Link>
+      <Link to="/profile/edit" className="self-center rounded-lg border border-ghost-dim/30 px-6 py-2 text-sm text-ghost-dim transition-colors hover:border-ghost-dim/60 hover:text-ghost">编辑档案</Link>
     </div>
   );
 }
 
 function TeamTab({
-  myRecruitments,
-  myApplications,
-  getRecruitmentById,
-  getApplicationsByRecruitment,
+  myRecruitments, myApplications, getRecruitmentById, getApplicationsByRecruitment, getPlayerById,
 }: {
   myRecruitments: ReturnType<typeof useAppStore.getState>['recruitments'];
   myApplications: ReturnType<typeof useAppStore.getState>['applications'];
-  getRecruitmentById: (id: string) => ReturnType<typeof useAppStore.getState>['recruitments'][number] | undefined;
-  getApplicationsByRecruitment: (recruitmentId: string) => ReturnType<typeof useAppStore.getState>['applications'];
+  getRecruitmentById: (id: string) => any;
+  getApplicationsByRecruitment: (id: string) => any;
+  getPlayerById: (id: string) => any;
 }) {
+  const [expandedRec, setExpandedRec] = useState<string | null>(null);
+
   return (
     <div className="mt-2 flex flex-col gap-8">
       <section>
         <h2 className="mb-3 text-sm font-medium tracking-wider text-ghost-dim uppercase">我发起的</h2>
         {myRecruitments.length === 0 ? (
-          <div className="rounded-xl border border-ghost-dim/10 bg-noir-surface p-6 text-center text-sm text-ghost-dim">
-            还没有发起过招募
-          </div>
+          <EmptyState text="还没有发起过招募" />
         ) : (
           <div className="flex flex-col gap-3">
             {myRecruitments.map((rec) => {
               const apps = getApplicationsByRecruitment(rec.id);
-              const pendingCount = apps.filter((a) => a.status === '待审核').length;
+              const pending = apps.filter((a: Application) => a.status === '待审核');
+              const confirmed = apps.filter((a: Application) => a.status === '已确认');
+              const rejected = apps.filter((a: Application) => a.status === '已婉拒');
+              const confirmedMain = confirmed.filter((a: Application) => !a.isSubstitute);
               const isFull = rec.currentPlayers >= rec.totalPlayers;
+              const isExpanded = expandedRec === rec.id;
+
               return (
-                <Link
-                  key={rec.id}
-                  to={`/recruit/${rec.id}`}
-                  className="group rounded-xl border border-ghost-dim/10 bg-noir-surface p-4 transition-colors hover:border-amber/30"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-ghost group-hover:text-amber-light transition-colors">
-                      {rec.scriptName}
-                    </span>
-                    <DifficultyBadge difficulty={rec.difficulty} />
+                <div key={rec.id} className="rounded-xl border border-ghost-dim/10 bg-noir-surface transition-colors hover:border-amber/30 overflow-hidden">
+                  <button onClick={() => setExpandedRec(isExpanded ? null : rec.id)} className="w-full text-left p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-ghost hover:text-amber-light transition-colors">{rec.scriptName}</span>
+                        <DifficultyBadge difficulty={rec.difficulty} />
+                      </div>
+                      <ChevronDown size={18} className={cn('text-ghost-dim transition-transform duration-300', isExpanded && 'rotate-180 text-amber')} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-ghost-dim">{rec.currentPlayers}/{rec.totalPlayers}人</span>
+                      {pending.length > 0 && <span className={cn('rounded-full border px-2 py-0.5', BADGE.pending)}>待审核{pending.length}</span>}
+                      {confirmedMain.length > 0 && <span className={cn('rounded-full border px-2 py-0.5', BADGE.confirmed)}>已确认{confirmedMain.length}</span>}
+                      {rejected.length > 0 && <span className={cn('rounded-full border px-2 py-0.5', BADGE.rejected)}>已婉拒{rejected.length}</span>}
+                      {isFull && <span className={cn('rounded-full border px-2 py-0.5', BADGE.full)}>已满</span>}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-ghost-dim">
+                      <span className="flex items-center gap-1"><Clock size={12} className="text-amber/70" />{rec.driveTime}</span>
+                      <span className="flex items-center gap-1"><MapPin size={12} className="text-amber/70" />{rec.store}</span>
+                    </div>
+                  </button>
+                  <div className={cn('transition-all duration-300 overflow-hidden', isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0')}>
+                    <div className="px-4 pb-4 pt-2 flex flex-col gap-5 border-t border-ghost-dim/10">
+                      <ApplicantGroup label="待审核" labelClass={BADGE.groupPending} apps={pending} getPlayerById={getPlayerById} recId={rec.id} />
+                      <ApplicantGroup label="已确认" labelClass={BADGE.groupConfirmed} apps={confirmed} getPlayerById={getPlayerById} recId={rec.id} showConfirmedDetails />
+                      <ApplicantGroup label="已婉拒" labelClass={BADGE.groupRejected} apps={rejected} getPlayerById={getPlayerById} recId={rec.id} showRejectedRemark />
+                    </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-2 text-xs">
-                    <span className="text-ghost-dim">{rec.currentPlayers}/{rec.totalPlayers}人</span>
-                    {pendingCount > 0 && (
-                      <span className="rounded-full border border-amber/30 bg-amber/20 px-2 py-0.5 text-amber-light">
-                        待审核{pendingCount}
-                      </span>
-                    )}
-                    {isFull && (
-                      <span className="rounded-full border border-smoke/30 bg-smoke/20 px-2 py-0.5 text-smoke">
-                        已满
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-ghost-dim">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} className="text-amber/70" />
-                      {rec.driveTime}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-amber/70" />
-                      {rec.store}
-                    </span>
-                  </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -168,53 +153,75 @@ function TeamTab({
       <section>
         <h2 className="mb-3 text-sm font-medium tracking-wider text-ghost-dim uppercase">我报名的</h2>
         {myApplications.length === 0 ? (
-          <div className="rounded-xl border border-ghost-dim/10 bg-noir-surface p-6 text-center text-sm text-ghost-dim">
-            还没有报名记录
-          </div>
+          <EmptyState text="还没有报名记录" />
         ) : (
           <div className="flex flex-col gap-3">
             {myApplications.map((app) => {
               const rec = getRecruitmentById(app.recruitmentId);
               const isRejected = app.status === '已婉拒';
               return (
-                <Link
-                  key={app.id}
-                  to={`/recruit/${app.recruitmentId}`}
-                  className={cn(
-                    'group rounded-xl border bg-noir-surface p-4 transition-colors hover:border-amber/30',
-                    isRejected ? 'border-red-800/40' : 'border-ghost-dim/10'
+                <div key={app.id} className={cn('rounded-xl border bg-noir-surface p-4 transition-colors hover:border-amber/30', isRejected ? 'border-crimson/30' : 'border-ghost-dim/10')}>
+                  <Link to={`/recruit/${app.recruitmentId}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-ghost group-hover:text-amber-light transition-colors">{rec?.scriptName ?? '未知剧本'}</span>
+                      <span className={cn('rounded-full border px-2.5 py-0.5 text-xs', APP_STATUS_STYLES[app.status])}>{app.status}</span>
+                    </div>
+                    <p className="mt-2 line-clamp-1 text-xs text-ghost-dim">{app.selfIntroduction}</p>
+                    <div className="mt-3 flex items-center justify-between text-xs text-ghost-dim">
+                      <span className="flex items-center gap-1"><Clock size={12} className="text-amber/70" />{rec?.driveTime ?? '待定'}</span>
+                      <span className="flex items-center gap-1"><MapPin size={12} className="text-amber/70" />{rec?.store ?? '待定'}</span>
+                    </div>
+                  </Link>
+                  {app.remark && (
+                    <div className={cn('mt-3 rounded-lg border px-3 py-2 text-xs', isRejected ? 'border-crimson/30 bg-crimson/10 text-crimson-light' : 'border-amber/30 bg-amber/10 text-amber-light')}>
+                      <span className="opacity-70">备注：</span>{app.remark}
+                    </div>
                   )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-ghost group-hover:text-amber-light transition-colors">
-                      {rec?.scriptName ?? '未知剧本'}
-                    </span>
-                    <span
-                      className={cn(
-                        'rounded-full border px-2.5 py-0.5 text-xs',
-                        APP_STATUS_STYLES[app.status]
-                      )}
-                    >
-                      {app.status}
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-1 text-xs text-ghost-dim">{app.selfIntroduction}</p>
-                  <div className="mt-3 flex items-center justify-between text-xs text-ghost-dim">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} className="text-amber/70" />
-                      {rec?.driveTime ?? '待定'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-amber/70" />
-                      {rec?.store ?? '待定'}
-                    </span>
-                  </div>
-                </Link>
+                </div>
               );
             })}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded-xl border border-ghost-dim/10 bg-noir-surface p-6 text-center text-sm text-ghost-dim">{text}</div>;
+}
+
+function ApplicantGroup({
+  label, labelClass, apps, getPlayerById, recId, showConfirmedDetails, showRejectedRemark,
+}: {
+  label: string; labelClass: string; apps: Application[]; getPlayerById: any; recId: string;
+  showConfirmedDetails?: boolean; showRejectedRemark?: boolean;
+}) {
+  if (apps.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <span className={cn('self-start rounded-full border px-2.5 py-0.5 text-[11px]', labelClass)}>{label} {apps.length}</span>
+      <div className="flex flex-col gap-2">
+        {apps.map((app) => {
+          const player = getPlayerById(app.playerId);
+          return (
+            <Link key={app.id} to={`/recruit/${recId}`} className="flex items-start gap-3 rounded-lg border border-ghost-dim/10 bg-smoke/20 p-3 transition-colors hover:border-amber/30 hover:bg-smoke/40">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-noir-800 flex items-center justify-center text-lg overflow-hidden">
+                {player?.avatar ? <img src={player.avatar} alt="" className="h-full w-full object-cover" /> : '🎭'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-ghost truncate">{player?.nickname ?? '未知玩家'}</span>
+                  {showConfirmedDetails && app.contacted && <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px]', BADGE.contacted)}>✓已联系</span>}
+                  {showConfirmedDetails && app.isSubstitute && <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px]', BADGE.sub)}>替补</span>}
+                </div>
+                {!showRejectedRemark && <p className="mt-1 line-clamp-1 text-xs text-ghost-dim">{app.selfIntroduction}</p>}
+                {showRejectedRemark && app.remark && <div className="mt-1 rounded-md border border-crimson/30 bg-crimson/10 px-2 py-1.5 text-xs text-crimson-light">{app.remark}</div>}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
