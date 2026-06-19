@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import TagSelector from '@/components/TagSelector';
 import { ROLES, DIFFICULTIES, type Difficulty } from '@/types';
 
 export default function CreateRecruitment() {
   const navigate = useNavigate();
+  const currentPlayer = useAppStore((s) => s.currentPlayer);
   const createRecruitment = useAppStore((s) => s.createRecruitment);
 
   const [scriptName, setScriptName] = useState('');
@@ -23,6 +24,7 @@ export default function CreateRecruitment() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPlayer) return;
     createRecruitment({
       scriptName,
       difficulty,
@@ -38,6 +40,37 @@ export default function CreateRecruitment() {
     });
     navigate('/');
   };
+
+  if (!currentPlayer) {
+    return (
+      <div className="min-h-screen bg-noir">
+        <div className="flex items-center gap-3 p-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="rounded-lg p-2 text-ghost-dim transition-colors hover:bg-noir-surface hover:text-ghost"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="font-display text-2xl text-ghost">发车</h1>
+        </div>
+        <div className="mx-auto max-w-md px-6 pt-16 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-noir-surface">
+            <FileText size={32} className="text-amber/60" />
+          </div>
+          <h2 className="mb-2 font-display text-xl text-ghost">先创建你的推理档案</h2>
+          <p className="mb-6 text-sm text-ghost-dim">
+            作为车头需要先完善个人档案，让队友了解你的推理风格
+          </p>
+          <Link
+            to="/profile/edit"
+            className="inline-flex items-center justify-center rounded-lg bg-amber px-8 py-3 text-sm font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
+          >
+            去创建档案
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-noir pb-24">
@@ -157,7 +190,7 @@ export default function CreateRecruitment() {
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-amber py-3 font-medium text-noir transition-colors hover:bg-amber-dark"
+          className="w-full rounded-lg bg-amber py-3 font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
         >
           发布招募
         </button>

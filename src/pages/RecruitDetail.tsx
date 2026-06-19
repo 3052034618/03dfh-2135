@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, BookOpen, UserCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { ArrowLeft, MapPin, Clock, BookOpen, UserCheck, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import DifficultyBadge from '@/components/DifficultyBadge';
 import ProfileCard from '@/components/ProfileCard';
@@ -22,6 +22,7 @@ const APP_STATUS_MAP: Record<AppStatus, string> = {
 export default function RecruitDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [intro, setIntro] = useState('');
 
   const currentPlayer = useAppStore((s) => s.currentPlayer);
@@ -38,7 +39,14 @@ export default function RecruitDetail() {
   const isOrganizer = currentPlayer?.id === recruitment?.organizerId;
   const myApp = getMyApplications().find((a) => a.recruitmentId === id);
   const alreadyApplied = hasApplied(id ?? '');
+  const isFull = recruitment ? recruitment.currentPlayers >= recruitment.totalPlayers : false;
   const isClosed = recruitment?.status === '已满员' || recruitment?.status === '已截止';
+
+  useEffect(() => {
+    if (alreadyApplied && myApp && intro) {
+      setIntro('');
+    }
+  }, [alreadyApplied, myApp, intro]);
 
   if (!recruitment) {
     return (
@@ -49,14 +57,19 @@ export default function RecruitDetail() {
   }
 
   const handleSubmit = () => {
-    if (!intro.trim() || !id) return;
+    if (!intro.trim() || !id || !currentPlayer) return;
     submitApplication(id, intro.trim());
-    setIntro('');
+  };
+
+  const canConfirm = (appStatus: AppStatus) => {
+    if (appStatus !== '待审核') return false;
+    if (isFull) return false;
+    return true;
   };
 
   return (
     <div className="min-h-screen bg-noir font-body text-ghost">
-      <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
+      <div className="mx-auto max-w-lg px-4 pb-44 pt-4">
         <button
           onClick={() => navigate(-1)}
           className="mb-4 flex items-center gap-1.5 text-sm text-ghost-dim transition-colors hover:text-amber"
@@ -131,10 +144,17 @@ export default function RecruitDetail() {
 
         {isOrganizer && (
           <div className="mt-6 animate-slide-up">
-            <h2 className="mb-3 text-lg font-medium text-ghost">
-              报名列表
-              <span className="ml-2 text-sm text-ghost-dim">({applications.length})</span>
-            </h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-ghost">
+                报名列表
+                <span className="ml-2 text-sm text-ghost-dim">({applications.length})</span>
+              </h2>
+              {isFull && (
+                <span className="rounded-full bg-smoke/20 px-2 py-0.5 text-xs text-smoke">
+                  已满员
+                </span>
+              )}
+            </div>
             {applications.length === 0 ? (
               <p className="py-8 text-center text-sm text-ghost-dim">暂无报名</p>
             ) : (
@@ -143,6 +163,7 @@ export default function RecruitDetail() {
                   const player = getPlayerById(app.playerId);
                   if (!player) return null;
                   const reviewed = app.status !== '待审核';
+                  const confirmDisabled = !canConfirm(app.status);
                   return (
                     <div
                       key={app.id}
@@ -165,9 +186,16 @@ export default function RecruitDetail() {
                         <div className="mt-3 flex gap-2">
                           <button
                             onClick={() => reviewApplication(app.id, '已确认')}
-                            className="rounded-lg bg-amber/90 px-4 py-1.5 text-sm font-medium text-noir transition-colors hover:bg-amber"
+                            disabled={confirmDisabled}
+                            className={cn(
+                              'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors',
+                              confirmDisabled
+                                ? 'cursor-not-allowed bg-smoke/30 text-ghost-dim'
+                                : 'bg-amber/90 text-noir hover:bg-amber'
+                            )}
                           >
                             确认
+                            {isFull && '（已满）'}
                           </button>
                           <button
                             onClick={() => reviewApplication(app.id, '已婉拒')}
@@ -187,22 +215,47 @@ export default function RecruitDetail() {
       </div>
 
       {!isOrganizer && (
-        <div className="fixed inset-x-0 bottom-0 border-t border-noir-light/40 bg-noir-surface/90 p-4 backdrop-blur-lg">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-noir-light/40 bg-noir-surface/95 p-4 backdrop-blur-xl pb-safe">
           <div className="mx-auto max-w-lg">
-            {alreadyApplied && myApp ? (
-              <div className="flex items-center justify-center gap-2 py-2">
-                <span className="text-sm text-ghost-dim">报名状态：</span>
-                <span
-                  className={cn(
-                    'rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                    APP_STATUS_MAP[myApp.status],
-                  )}
+            {!currentPlayer ? (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <div className="flex items-center gap-2 text-sm text-ghost-dim">
+                  <FileText size={16} />
+                  <span>创建推理档案后才能报名</span>
+                </div>
+                <Link
+                  to="/profile/edit"
+                  state={{ from: location.pathname }}
+                  className="w-full rounded-lg bg-amber py-2.5 text-sm font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
                 >
-                  {myApp.status}
-                </span>
+                  先创建档案
+                </Link>
+              </div>
+            ) : alreadyApplied && myApp ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-ghost-dim">报名状态：</span>
+                  <span
+                    className={cn(
+                      'rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                      APP_STATUS_MAP[myApp.status],
+                    )}
+                  >
+                    {myApp.status}
+                  </span>
+                </div>
+                <p className="text-xs text-ghost-dim/70">{myApp.selfIntroduction}</p>
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-noir-light text-sm">
+                    {currentPlayer.avatar}
+                  </span>
+                  <span className="text-sm text-ghost-dim">
+                    {currentPlayer.nickname} · {currentPlayer.favoriteTypes.slice(0, 2).join('、')}
+                  </span>
+                </div>
                 <textarea
                   value={intro}
                   onChange={(e) => setIntro(e.target.value)}
@@ -217,7 +270,7 @@ export default function RecruitDetail() {
                     'w-full rounded-lg py-2.5 text-sm font-medium transition-all',
                     isClosed || !intro.trim()
                       ? 'cursor-not-allowed bg-smoke/30 text-ghost-dim'
-                      : 'bg-amber/90 text-noir hover:bg-amber',
+                      : 'bg-amber/90 text-noir hover:bg-amber active:scale-[0.98]',
                   )}
                 >
                   {isClosed ? '招募已结束' : '提交报名'}

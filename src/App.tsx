@@ -8,7 +8,7 @@ import CreateRecruitment from '@/pages/CreateRecruitment'
 
 function LayoutWrapper() {
   const { pathname } = useLocation()
-  const hideNav = pathname.startsWith('/profile/edit') || pathname.startsWith('/create')
+  const hideNav = pathname.startsWith('/profile/edit') || pathname.startsWith('/create') || pathname.startsWith('/recruit/')
 
   return hideNav ? (
     <Outlet />
