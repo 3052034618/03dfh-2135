@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/lib/utils';
-import { FileText, Car, Clock, MapPin, ChevronDown } from 'lucide-react';
+import { ChevronDown, FileText, Car, Clock, MapPin, Bell, Check } from 'lucide-react';
 import ProfileCard from '@/components/ProfileCard';
 import DifficultyBadge from '@/components/DifficultyBadge';
-import type { AppStatus, Application } from '@/types';
+import type { AppStatus, Application, Notice } from '@/types';
 
 const APP_STATUS_STYLES: Record<AppStatus, string> = {
   '待审核': 'bg-amber/20 text-amber-light border-amber/30',
@@ -23,6 +23,8 @@ const BADGE = {
   groupRejected: 'border-crimson/30 bg-crimson/10 text-crimson-light',
   contacted: 'border-emerald-700/40 bg-emerald-900/30 text-emerald-400',
   sub: 'border-amber/30 bg-amber/20 text-amber-light',
+  attendanceDone: 'border-emerald-600/40 bg-emerald-800/30 text-emerald-300',
+  attendancePending: 'border-smoke/40 bg-smoke/25 text-smoke-light',
 };
 
 export default function Profile() {
@@ -33,6 +35,11 @@ export default function Profile() {
   const getRecruitmentById = useAppStore((s) => s.getRecruitmentById);
   const getApplicationsByRecruitment = useAppStore((s) => s.getApplicationsByRecruitment);
   const getPlayerById = useAppStore((s) => s.getPlayerById);
+  const getNoticeByRecruitment = useAppStore((s) => s.getNoticeByRecruitment);
+  const markNoticeRead = useAppStore((s) => s.markNoticeRead);
+  const hasUnreadNotice = useAppStore((s) => s.hasUnreadNotice);
+  const confirmAttendance = useAppStore((s) => s.confirmAttendance);
+  const hasConfirmedAttendance = useAppStore((s) => s.hasConfirmedAttendance);
 
   return (
     <div className="min-h-screen bg-noir pb-20">
@@ -45,11 +52,17 @@ export default function Profile() {
           <ProfileTab currentPlayer={currentPlayer} />
         ) : (
           <TeamTab
+            currentPlayer={currentPlayer}
             myRecruitments={getMyRecruitments()}
             myApplications={getMyApplications()}
             getRecruitmentById={getRecruitmentById}
             getApplicationsByRecruitment={getApplicationsByRecruitment}
             getPlayerById={getPlayerById}
+            getNoticeByRecruitment={getNoticeByRecruitment}
+            markNoticeRead={markNoticeRead}
+            hasUnreadNotice={hasUnreadNotice}
+            confirmAttendance={confirmAttendance}
+            hasConfirmedAttendance={hasConfirmedAttendance}
           />
         )}
       </div>
@@ -87,13 +100,20 @@ function ProfileTab({ currentPlayer }: { currentPlayer: ReturnType<typeof useApp
 }
 
 function TeamTab({
-  myRecruitments, myApplications, getRecruitmentById, getApplicationsByRecruitment, getPlayerById,
+  currentPlayer, myRecruitments, myApplications, getRecruitmentById, getApplicationsByRecruitment, getPlayerById,
+  getNoticeByRecruitment, markNoticeRead, hasUnreadNotice, confirmAttendance, hasConfirmedAttendance,
 }: {
+  currentPlayer: ReturnType<typeof useAppStore.getState>['currentPlayer'];
   myRecruitments: ReturnType<typeof useAppStore.getState>['recruitments'];
   myApplications: ReturnType<typeof useAppStore.getState>['applications'];
   getRecruitmentById: (id: string) => any;
   getApplicationsByRecruitment: (id: string) => any;
   getPlayerById: (id: string) => any;
+  getNoticeByRecruitment: (id: string) => Notice | undefined;
+  markNoticeRead: (id: string) => void;
+  hasUnreadNotice: (id: string) => boolean;
+  confirmAttendance: (id: string) => void;
+  hasConfirmedAttendance: (playerId: string, recruitmentId: string) => boolean;
 }) {
   const [expandedRec, setExpandedRec] = useState<string | null>(null);
 
@@ -113,6 +133,7 @@ function TeamTab({
               const confirmedMain = confirmed.filter((a: Application) => !a.isSubstitute);
               const isFull = rec.currentPlayers >= rec.totalPlayers;
               const isExpanded = expandedRec === rec.id;
+              const notice = getNoticeByRecruitment(rec.id);
 
               return (
                 <div key={rec.id} className="rounded-xl border border-ghost-dim/10 bg-noir-surface transition-colors hover:border-amber/30 overflow-hidden">
@@ -138,9 +159,26 @@ function TeamTab({
                   </button>
                   <div className={cn('transition-all duration-300 overflow-hidden', isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0')}>
                     <div className="px-4 pb-4 pt-2 flex flex-col gap-5 border-t border-ghost-dim/10">
-                      <ApplicantGroup label="待审核" labelClass={BADGE.groupPending} apps={pending} getPlayerById={getPlayerById} recId={rec.id} />
-                      <ApplicantGroup label="已确认" labelClass={BADGE.groupConfirmed} apps={confirmed} getPlayerById={getPlayerById} recId={rec.id} showConfirmedDetails />
-                      <ApplicantGroup label="已婉拒" labelClass={BADGE.groupRejected} apps={rejected} getPlayerById={getPlayerById} recId={rec.id} showRejectedRemark />
+                      {notice ? (
+                        <div className="rounded-lg border border-amber/40 bg-gradient-to-br from-amber/15 via-amber/10 to-amber/5 p-3">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Bell size={14} className="text-amber" />
+                            <span className="text-sm font-medium text-amber-light">集合通知</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5 text-xs text-ghost">
+                            <span className="flex items-center gap-1.5"><Clock size={12} className="text-amber/70 shrink-0" />{notice.arrivalTime}</span>
+                            <span className="flex items-center gap-1.5"><MapPin size={12} className="text-amber/70 shrink-0" />{notice.storeLocation}</span>
+                            {notice.notes && <span className="text-ghost-dim mt-1">{notice.notes}</span>}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-ghost-dim/20 bg-smoke/10 p-3 text-center text-xs text-ghost-dim">
+                          尚未发布集合通知
+                        </div>
+                      )}
+                      <ApplicantGroup label="待审核" labelClass={BADGE.groupPending} apps={pending} getPlayerById={getPlayerById} recId={rec.id} hasConfirmedAttendance={hasConfirmedAttendance} />
+                      <ApplicantGroup label="已确认" labelClass={BADGE.groupConfirmed} apps={confirmed} getPlayerById={getPlayerById} recId={rec.id} showConfirmedDetails hasConfirmedAttendance={hasConfirmedAttendance} />
+                      <ApplicantGroup label="已婉拒" labelClass={BADGE.groupRejected} apps={rejected} getPlayerById={getPlayerById} recId={rec.id} showRejectedRemark hasConfirmedAttendance={hasConfirmedAttendance} />
                     </div>
                   </div>
                 </div>
@@ -159,8 +197,22 @@ function TeamTab({
             {myApplications.map((app) => {
               const rec = getRecruitmentById(app.recruitmentId);
               const isRejected = app.status === '已婉拒';
+              const hasUnread = hasUnreadNotice(app.recruitmentId);
+              const notice = getNoticeByRecruitment(app.recruitmentId);
+              const confirmed = currentPlayer ? hasConfirmedAttendance(currentPlayer.id, app.recruitmentId) : false;
+              const showAttendanceBtn = app.status === '已确认';
+
+              if (notice && !currentPlayer?.readNoticeIds.includes(notice.id)) {
+                markNoticeRead(notice.id);
+              }
+
               return (
-                <div key={app.id} className={cn('rounded-xl border bg-noir-surface p-4 transition-colors hover:border-amber/30', isRejected ? 'border-crimson/30' : 'border-ghost-dim/10')}>
+                <div key={app.id} className={cn('rounded-xl border bg-noir-surface p-4 transition-colors hover:border-amber/30 relative', isRejected ? 'border-crimson/30' : 'border-ghost-dim/10')}>
+                  {hasUnread && (
+                    <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-crimson/90 px-2 py-0.5 text-[10px] font-medium text-white">
+                      🔴 新通知
+                    </span>
+                  )}
                   <Link to={`/recruit/${app.recruitmentId}`}>
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-ghost group-hover:text-amber-light transition-colors">{rec?.scriptName ?? '未知剧本'}</span>
@@ -172,6 +224,33 @@ function TeamTab({
                       <span className="flex items-center gap-1"><MapPin size={12} className="text-amber/70" />{rec?.store ?? '待定'}</span>
                     </div>
                   </Link>
+                  {notice && (
+                    <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Bell size={13} className="text-amber" />
+                        <span className="text-xs font-medium text-amber-light">集合通知</span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-xs text-ghost">
+                        <span className="flex items-center gap-1.5"><Clock size={11} className="text-amber/70 shrink-0" />{notice.arrivalTime}</span>
+                        <span className="flex items-center gap-1.5"><MapPin size={11} className="text-amber/70 shrink-0" />{notice.storeLocation}</span>
+                        {notice.notes && <span className="text-ghost-dim mt-0.5">{notice.notes}</span>}
+                      </div>
+                    </div>
+                  )}
+                  {showAttendanceBtn && (
+                    <button
+                      onClick={() => confirmAttendance(app.recruitmentId)}
+                      disabled={confirmed}
+                      className={cn(
+                        'mt-3 w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5',
+                        confirmed
+                          ? 'bg-emerald-800/30 text-emerald-300 border border-emerald-700/40 cursor-not-allowed'
+                          : 'bg-amber text-noir hover:bg-amber-dark'
+                      )}
+                    >
+                      {confirmed ? <><Check size={15} />已确认到场</> : (app.isSubstitute ? '替补-我已确认到场' : '我已确认到场')}
+                    </button>
+                  )}
                   {app.remark && (
                     <div className={cn('mt-3 rounded-lg border px-3 py-2 text-xs', isRejected ? 'border-crimson/30 bg-crimson/10 text-crimson-light' : 'border-amber/30 bg-amber/10 text-amber-light')}>
                       <span className="opacity-70">备注：</span>{app.remark}
@@ -192,10 +271,11 @@ function EmptyState({ text }: { text: string }) {
 }
 
 function ApplicantGroup({
-  label, labelClass, apps, getPlayerById, recId, showConfirmedDetails, showRejectedRemark,
+  label, labelClass, apps, getPlayerById, recId, showConfirmedDetails, showRejectedRemark, hasConfirmedAttendance,
 }: {
   label: string; labelClass: string; apps: Application[]; getPlayerById: any; recId: string;
   showConfirmedDetails?: boolean; showRejectedRemark?: boolean;
+  hasConfirmedAttendance: (playerId: string, recruitmentId: string) => boolean;
 }) {
   if (apps.length === 0) return null;
   return (
@@ -204,6 +284,7 @@ function ApplicantGroup({
       <div className="flex flex-col gap-2">
         {apps.map((app) => {
           const player = getPlayerById(app.playerId);
+          const attended = hasConfirmedAttendance(app.playerId, recId);
           return (
             <Link key={app.id} to={`/recruit/${recId}`} className="flex items-start gap-3 rounded-lg border border-ghost-dim/10 bg-smoke/20 p-3 transition-colors hover:border-amber/30 hover:bg-smoke/40">
               <div className="h-10 w-10 shrink-0 rounded-full bg-noir-800 flex items-center justify-center text-lg overflow-hidden">
@@ -214,6 +295,11 @@ function ApplicantGroup({
                   <span className="text-sm font-medium text-ghost truncate">{player?.nickname ?? '未知玩家'}</span>
                   {showConfirmedDetails && app.contacted && <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px]', BADGE.contacted)}>✓已联系</span>}
                   {showConfirmedDetails && app.isSubstitute && <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px]', BADGE.sub)}>替补</span>}
+                  {showConfirmedDetails && (
+                    <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px]', attended ? BADGE.attendanceDone : BADGE.attendancePending)}>
+                      {attended ? '✓已到场' : '未回应'}
+                    </span>
+                  )}
                 </div>
                 {!showRejectedRemark && <p className="mt-1 line-clamp-1 text-xs text-ghost-dim">{app.selfIntroduction}</p>}
                 {showRejectedRemark && app.remark && <div className="mt-1 rounded-md border border-crimson/30 bg-crimson/10 px-2 py-1.5 text-xs text-crimson-light">{app.remark}</div>}

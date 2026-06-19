@@ -7,6 +7,8 @@ export interface Player {
   reviewHabit: string;
   redFlags: string[];
   avatar: string;
+  readNoticeIds: string[];
+  confirmedAttendanceIds: string[];
   createdAt: string;
 }
 
@@ -21,6 +23,7 @@ export interface Recruitment {
   difficulty: Difficulty;
   totalPlayers: number;
   currentPlayers: number;
+  baseHeadcount: number;
   store: string;
   driveTime: string;
   missingRoles: string[];
@@ -40,6 +43,16 @@ export interface Application {
   remark?: string;
   contacted?: boolean;
   isSubstitute?: boolean;
+  createdAt: string;
+}
+
+export interface Notice {
+  id: string;
+  recruitmentId: string;
+  organizerId: string;
+  arrivalTime: string;
+  storeLocation: string;
+  notes: string;
   createdAt: string;
 }
 

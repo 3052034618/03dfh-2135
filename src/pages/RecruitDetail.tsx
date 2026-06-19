@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, BookOpen, UserCheck, FileText } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, BookOpen, UserCheck, FileText, Megaphone } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import DifficultyBadge from '@/components/DifficultyBadge';
 import ProfileCard from '@/components/ProfileCard';
@@ -64,6 +64,10 @@ export default function RecruitDetail() {
   const [intro, setIntro] = useState('');
   const [reviewingAppId, setReviewingAppId] = useState<string | null>(null);
   const [remark, setRemark] = useState('');
+  const [showNoticeForm, setShowNoticeForm] = useState(false);
+  const [arrivalTime, setArrivalTime] = useState('');
+  const [storeLocation, setStoreLocation] = useState('');
+  const [noticeNotes, setNoticeNotes] = useState('');
 
   const currentPlayer = useAppStore((s) => s.currentPlayer);
   const getRecruitmentById = useAppStore((s) => s.getRecruitmentById);
@@ -76,6 +80,12 @@ export default function RecruitDetail() {
   const toggleSubstitute = useAppStore((s) => s.toggleSubstitute);
   const hasApplied = useAppStore((s) => s.hasApplied);
   const getMyApplications = useAppStore((s) => s.getMyApplications);
+  const createNotice = useAppStore((s) => s.createNotice);
+  const getNoticeByRecruitment = useAppStore((s) => s.getNoticeByRecruitment);
+  const markNoticeRead = useAppStore((s) => s.markNoticeRead);
+  const hasUnreadNotice = useAppStore((s) => s.hasUnreadNotice);
+  const confirmAttendance = useAppStore((s) => s.confirmAttendance);
+  const hasConfirmedAttendance = useAppStore((s) => s.hasConfirmedAttendance);
 
   const recruitment = getRecruitmentById(id ?? '');
   const applications = getApplicationsByRecruitment(id ?? '');
@@ -84,8 +94,23 @@ export default function RecruitDetail() {
   const alreadyApplied = hasApplied(id ?? '');
   const isFull = recruitment ? recruitment.currentPlayers >= recruitment.totalPlayers : false;
   const isClosed = recruitment?.status === '已满员' || recruitment?.status === '已截止';
+  const notice = id ? getNoticeByRecruitment(id) : undefined;
+  const unreadNotice = id ? hasUnreadNotice(id) : false;
+  const myAttendanceConfirmed = currentPlayer && id ? hasConfirmedAttendance(currentPlayer.id, id) : false;
 
   useEffect(() => { if (alreadyApplied && myApp && intro) setIntro(''); }, [alreadyApplied, myApp, intro]);
+
+  useEffect(() => {
+    if (notice && currentPlayer && !isOrganizer && unreadNotice) {
+      markNoticeRead(notice.id);
+    }
+  }, [notice, currentPlayer, isOrganizer, unreadNotice, markNoticeRead]);
+
+  useEffect(() => {
+    if (recruitment) {
+      setStoreLocation(recruitment.store);
+    }
+  }, [recruitment]);
 
   if (!recruitment) {
     return <div className="flex min-h-screen items-center justify-center bg-noir font-body text-ghost-dim"><p>招募不存在或已删除</p></div>;
@@ -96,9 +121,29 @@ export default function RecruitDetail() {
   const openReview = (aid: string) => { setReviewingAppId(aid); setRemark(''); };
   const closeReview = () => { setReviewingAppId(null); setRemark(''); };
   const handleReview = (aid: string, status: '已确认' | '已婉拒') => { reviewApplication(aid, status, remark.trim() || undefined); closeReview(); };
+  const handleCreateNotice = () => {
+    if (!id || !arrivalTime.trim() || !storeLocation.trim()) return;
+    createNotice({ recruitmentId: id, arrivalTime: arrivalTime.trim(), storeLocation: storeLocation.trim(), notes: noticeNotes.trim() });
+    setShowNoticeForm(false);
+    setArrivalTime('');
+    setNoticeNotes('');
+  };
+  const handleRepublish = () => {
+    setShowNoticeForm(true);
+    if (notice) {
+      setArrivalTime(notice.arrivalTime);
+      setStoreLocation(notice.storeLocation);
+      setNoticeNotes(notice.notes);
+    }
+  };
+  const handleConfirmAttendance = () => {
+    if (!id) return;
+    confirmAttendance(id);
+  };
 
   const badgeCls = 'rounded-full border px-2 py-0.5 text-xs font-medium';
   const btnBase = 'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors';
+  const inputCls = 'w-full rounded-lg border border-noir-light/40 bg-noir-light/30 px-3 py-2 text-sm text-ghost placeholder:text-ghost-dim/50 focus:border-amber/50 focus:outline-none focus:ring-1 focus:ring-amber/30';
 
   return (
     <div className="min-h-screen bg-noir font-body text-ghost">
@@ -132,12 +177,76 @@ export default function RecruitDetail() {
           <p className="text-sm leading-relaxed text-ghost/70">{recruitment.description}</p>
         </div>
 
+        {!isOrganizer && notice && (
+          <div className="mt-6 animate-slide-up">
+            <div className="rounded-xl border-2 bg-gradient-to-br from-amber/20 via-amber/10 to-amber/5 p-4 backdrop-blur-sm" style={{ borderImage: 'linear-gradient(135deg, #f59e0b, #d97706, #f59e0b) 1' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-amber" />
+                <h3 className="font-medium text-amber-light">集合通知</h3>
+                {unreadNotice && <span className="ml-1 text-red-500">🔴</span>}
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2 text-ghost/90"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber" /><span>{notice.arrivalTime}</span></div>
+                <div className="flex items-start gap-2 text-ghost/90"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-amber" /><span>{notice.storeLocation}</span></div>
+                {notice.notes && <p className="text-ghost/80 leading-relaxed">{notice.notes}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {isOrganizer && (
           <div className="mt-6 animate-slide-up">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-medium text-ghost">报名列表<span className="ml-2 text-sm text-ghost-dim">({applications.length})</span></h2>
               {isFull && <span className="rounded-full bg-smoke/20 px-2 py-0.5 text-xs text-smoke">已满员</span>}
             </div>
+
+            {notice && !showNoticeForm ? (
+              <div className="mb-5 rounded-xl border-2 bg-gradient-to-br from-amber/20 via-amber/10 to-amber/5 p-4 backdrop-blur-sm" style={{ borderImage: 'linear-gradient(135deg, #f59e0b, #d97706, #f59e0b) 1' }}>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-amber" />
+                    <h3 className="font-medium text-amber-light">📣 集合通知</h3>
+                  </div>
+                  <button onClick={handleRepublish} className="rounded-md border border-amber/30 bg-amber/10 px-3 py-1 text-xs text-amber-light transition-colors hover:bg-amber/20">
+                    重新发布
+                  </button>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start gap-2 text-ghost/90"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber" /><span>{notice.arrivalTime}</span></div>
+                  <div className="flex items-start gap-2 text-ghost/90"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-amber" /><span>{notice.storeLocation}</span></div>
+                  {notice.notes && <p className="text-ghost/80 leading-relaxed">{notice.notes}</p>}
+                </div>
+              </div>
+            ) : showNoticeForm || !notice ? (
+              <div className="mb-5 rounded-xl border border-noir-light/30 bg-noir-surface/60 p-4 backdrop-blur-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <Megaphone className="h-5 w-5 text-amber" />
+                  <h3 className="font-medium text-ghost">集合通知</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className={labelCls}>到店时间</p>
+                    <input type="text" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} placeholder="如：2025-07-05 13:30" className={inputCls} />
+                  </div>
+                  <div>
+                    <p className={labelCls}>门店位置</p>
+                    <input type="text" value={storeLocation} onChange={(e) => setStoreLocation(e.target.value)} placeholder="门店地址" className={inputCls} />
+                  </div>
+                  <div>
+                    <p className={labelCls}>注意事项</p>
+                    <textarea value={noticeNotes} onChange={(e) => setNoticeNotes(e.target.value)} placeholder="补充说明..." rows={2} className={cn(inputCls, 'resize-none')} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleCreateNotice} disabled={!arrivalTime.trim() || !storeLocation.trim()} className={cn(btnBase, !arrivalTime.trim() || !storeLocation.trim() ? 'cursor-not-allowed bg-smoke/30 text-ghost-dim' : 'bg-amber/90 text-noir hover:bg-amber')}>
+                      发布通知
+                    </button>
+                    {notice && <button onClick={() => setShowNoticeForm(false)} className={cn(btnBase, 'border border-noir-light/30 text-ghost-dim hover:bg-noir-light/20')}>取消</button>}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {applications.length === 0 ? (
               <p className="py-8 text-center text-sm text-ghost-dim">暂无报名</p>
             ) : (
@@ -149,6 +258,7 @@ export default function RecruitDetail() {
                   const confirmDisabled = !canConfirm(app.status);
                   const isConfirmed = app.status === '已确认';
                   const isReviewingThis = reviewingAppId === app.id;
+                  const attendanceConfirmed = id ? hasConfirmedAttendance(app.playerId, id) : false;
                   return (
                     <div key={app.id} className="rounded-lg border border-noir-light/30 bg-noir-surface/60 p-4 backdrop-blur-sm">
                       <ProfileCard player={player} />
@@ -161,6 +271,11 @@ export default function RecruitDetail() {
                             <span className={cn(badgeCls, app.isSubstitute ? 'bg-smoke/15 text-ghost-dim border-smoke/25' : APP_STATUS_MAP[app.status])}>
                               {app.isSubstitute ? '替补中' : app.status}
                             </span>
+                            {isConfirmed && (
+                              attendanceConfirmed
+                                ? <span className={cn(badgeCls, 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400')}>✓已确认到场</span>
+                                : <span className={cn(badgeCls, 'border-smoke/25 bg-smoke/10 text-smoke')}>未回应</span>
+                            )}
                             {app.contacted && <span className={cn(badgeCls, 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400')}>✓已联系</span>}
                             {app.isSubstitute && <span className={cn(badgeCls, 'border-blue-500/30 bg-blue-500/15 text-blue-400')}>替补</span>}
                           </div>
@@ -235,6 +350,14 @@ export default function RecruitDetail() {
                     myApp.status === '已婉拒' ? 'border-crimson/20 bg-crimson/10 text-crimson-light/90' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400/90')}>
                     {myApp.remark}
                   </div>
+                )}
+                {myApp.status === '已确认' && (
+                  <button onClick={handleConfirmAttendance} disabled={myAttendanceConfirmed} className={cn('mt-2 w-full rounded-lg py-2.5 text-sm font-medium transition-all',
+                    myAttendanceConfirmed ? 'cursor-not-allowed bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber/90 text-noir hover:bg-amber active:scale-[0.98]')}>
+                    {myApp.isSubstitute
+                      ? (myAttendanceConfirmed ? '✓替补-已确认到场' : '替补-我已确认到场')
+                      : (myAttendanceConfirmed ? '✓已确认到场' : '我已确认到场')}
+                  </button>
                 )}
               </div>
             ) : (

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Player, Recruitment, Application, Difficulty, CreateDraft } from '@/types';
+import type { Player, Recruitment, Application, Difficulty, CreateDraft, Notice } from '@/types';
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -16,6 +16,8 @@ const MOCK_PLAYERS: Player[] = [
     reviewHabit: '每轮复盘',
     redFlags: ['恐怖演绎', '情感沉浸'],
     avatar: '🔍',
+    readNoticeIds: [],
+    confirmedAttendanceIds: [],
     createdAt: '2025-01-15T10:00:00Z',
   },
   {
@@ -27,6 +29,8 @@ const MOCK_PLAYERS: Player[] = [
     reviewHabit: '结束后复盘',
     redFlags: ['情感沉浸'],
     avatar: '🧠',
+    readNoticeIds: [],
+    confirmedAttendanceIds: [],
     createdAt: '2025-02-01T10:00:00Z',
   },
   {
@@ -38,6 +42,8 @@ const MOCK_PLAYERS: Player[] = [
     reviewHabit: '每轮复盘',
     redFlags: ['恐怖演绎', '迟到'],
     avatar: '📝',
+    readNoticeIds: [],
+    confirmedAttendanceIds: [],
     createdAt: '2025-01-20T10:00:00Z',
   },
   {
@@ -49,6 +55,8 @@ const MOCK_PLAYERS: Player[] = [
     reviewHabit: '偶尔复盘',
     redFlags: ['情感沉浸', '读本慢'],
     avatar: '🌙',
+    readNoticeIds: [],
+    confirmedAttendanceIds: [],
     createdAt: '2025-03-01T10:00:00Z',
   },
   {
@@ -60,6 +68,8 @@ const MOCK_PLAYERS: Player[] = [
     reviewHabit: '结束后复盘',
     redFlags: ['恐怖演绎', '跳车'],
     avatar: '🎯',
+    readNoticeIds: [],
+    confirmedAttendanceIds: [],
     createdAt: '2025-02-15T10:00:00Z',
   },
 ];
@@ -72,6 +82,7 @@ const MOCK_RECRUITMENTS: Recruitment[] = [
     difficulty: '地狱',
     totalPlayers: 6,
     currentPlayers: 3,
+    baseHeadcount: 3,
     store: '迷雾剧场·朝阳店',
     driveTime: '2025-07-05 14:00',
     missingRoles: ['C位推理', '信息整理', '笔记手'],
@@ -88,6 +99,7 @@ const MOCK_RECRUITMENTS: Recruitment[] = [
     difficulty: '烧脑',
     totalPlayers: 7,
     currentPlayers: 5,
+    baseHeadcount: 4,
     store: '剧坊推理·海淀店',
     driveTime: '2025-07-06 19:00',
     missingRoles: ['辅助推理', '任意位置'],
@@ -104,6 +116,7 @@ const MOCK_RECRUITMENTS: Recruitment[] = [
     difficulty: '烧脑',
     totalPlayers: 6,
     currentPlayers: 4,
+    baseHeadcount: 3,
     store: '迷雾剧场·西单店',
     driveTime: '2025-07-07 13:30',
     missingRoles: ['C位推理', '笔记手'],
@@ -120,6 +133,7 @@ const MOCK_RECRUITMENTS: Recruitment[] = [
     difficulty: '进阶',
     totalPlayers: 5,
     currentPlayers: 3,
+    baseHeadcount: 3,
     store: '剧本杀工厂·望京店',
     driveTime: '2025-07-08 14:00',
     missingRoles: ['辅助推理', '气氛担当'],
@@ -136,6 +150,7 @@ const MOCK_RECRUITMENTS: Recruitment[] = [
     difficulty: '地狱',
     totalPlayers: 6,
     currentPlayers: 6,
+    baseHeadcount: 5,
     store: '暗夜推理社·通州店',
     driveTime: '2025-07-04 19:00',
     missingRoles: [],
@@ -186,11 +201,12 @@ interface AppStore {
   currentPlayer: Player | null;
   recruitments: Recruitment[];
   applications: Application[];
+  notices: Notice[];
   players: Player[];
   createDraft: CreateDraft | null;
 
   updateProfile: (data: Partial<Player>) => void;
-  createRecruitment: (data: Omit<Recruitment, 'id' | 'createdAt' | 'organizerId'>) => void;
+  createRecruitment: (data: Omit<Recruitment, 'id' | 'createdAt' | 'organizerId' | 'baseHeadcount'>) => void;
   updateRecruitmentStatus: (id: string, status: Recruitment['status']) => void;
   submitApplication: (recruitmentId: string, selfIntroduction: string) => void;
   reviewApplication: (id: string, status: '已确认' | '已婉拒', remark?: string) => void;
@@ -198,6 +214,15 @@ interface AppStore {
   toggleContacted: (id: string) => void;
   toggleSubstitute: (id: string) => void;
   setRemark: (id: string, remark: string) => void;
+
+  createNotice: (data: Omit<Notice, 'id' | 'createdAt' | 'organizerId'>) => void;
+  getNoticeByRecruitment: (recruitmentId: string) => Notice | undefined;
+  markNoticeRead: (noticeId: string) => void;
+  hasUnreadNotice: (recruitmentId: string) => boolean;
+
+  confirmAttendance: (recruitmentId: string) => void;
+  hasConfirmedAttendance: (playerId: string, recruitmentId: string) => boolean;
+
   getRecruitmentById: (id: string) => Recruitment | undefined;
   getApplicationsByRecruitment: (recruitmentId: string) => Application[];
   getPlayerById: (id: string) => Player | undefined;
@@ -214,10 +239,11 @@ function recalcRecruitment(recruitments: Recruitment[], applications: Applicatio
     const confirmedCount = applications.filter(
       (a) => a.recruitmentId === recruitmentId && a.status === '已确认' && !a.isSubstitute
     ).length;
+    const total = r.baseHeadcount + confirmedCount;
     return {
       ...r,
-      currentPlayers: confirmedCount,
-      status: confirmedCount >= r.totalPlayers ? '已满员' : (r.status === '已截止' ? '已截止' : '招募中'),
+      currentPlayers: total,
+      status: total >= r.totalPlayers ? '已满员' : (r.status === '已截止' ? '已截止' : '招募中'),
     };
   });
 }
@@ -228,6 +254,7 @@ export const useAppStore = create<AppStore>()(
       currentPlayer: null,
       recruitments: MOCK_RECRUITMENTS,
       applications: MOCK_APPLICATIONS,
+      notices: [],
       players: MOCK_PLAYERS,
       createDraft: null,
 
@@ -243,6 +270,8 @@ export const useAppStore = create<AppStore>()(
               reviewHabit: '偶尔复盘',
               redFlags: [],
               avatar: '🕵️',
+              readNoticeIds: [],
+              confirmedAttendanceIds: [],
               createdAt: new Date().toISOString(),
               ...data,
             };
@@ -266,6 +295,7 @@ export const useAppStore = create<AppStore>()(
           ...data,
           id: generateId(),
           organizerId: state.currentPlayer.id,
+          baseHeadcount: data.currentPlayers,
           createdAt: new Date().toISOString(),
         };
         set((s) => ({
@@ -299,7 +329,7 @@ export const useAppStore = create<AppStore>()(
 
       reviewApplication: (id, status, remark) => {
         set((state) => {
-          const updatedApps = state.applications.map((a) =>
+          const updatedApps: Application[] = state.applications.map((a) =>
             a.id === id ? { ...a, status, remark: remark || a.remark, isSubstitute: false } : a
           );
           const app = state.applications.find((a) => a.id === id);
@@ -338,7 +368,7 @@ export const useAppStore = create<AppStore>()(
           const app = state.applications.find((a) => a.id === id);
           if (!app) return state;
           const wasSub = !!app.isSubstitute;
-          const updatedApps = state.applications.map((a) =>
+          const updatedApps: Application[] = state.applications.map((a) =>
             a.id === id ? { ...a, isSubstitute: !wasSub } : a
           );
           return {
@@ -354,6 +384,70 @@ export const useAppStore = create<AppStore>()(
             a.id === id ? { ...a, remark } : a
           ),
         }));
+      },
+
+      createNotice: (data) => {
+        const state = get();
+        if (!state.currentPlayer) return;
+        const newNotice: Notice = {
+          ...data,
+          id: generateId(),
+          organizerId: state.currentPlayer.id,
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          notices: [...s.notices, newNotice],
+        }));
+      },
+
+      getNoticeByRecruitment: (recruitmentId) => {
+        return get().notices
+          .filter((n) => n.recruitmentId === recruitmentId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      },
+
+      markNoticeRead: (noticeId) => {
+        const state = get();
+        if (!state.currentPlayer) return;
+        if (state.currentPlayer.readNoticeIds.includes(noticeId)) return;
+        const updated: Player = {
+          ...state.currentPlayer,
+          readNoticeIds: [...state.currentPlayer.readNoticeIds, noticeId],
+        };
+        set({
+          currentPlayer: updated,
+          players: state.players.map((p) => (p.id === updated.id ? updated : p)),
+        });
+      },
+
+      hasUnreadNotice: (recruitmentId) => {
+        const state = get();
+        if (!state.currentPlayer) return false;
+        const notice = state.notices
+          .filter((n) => n.recruitmentId === recruitmentId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        if (!notice) return false;
+        return !state.currentPlayer.readNoticeIds.includes(notice.id);
+      },
+
+      confirmAttendance: (recruitmentId) => {
+        const state = get();
+        if (!state.currentPlayer) return;
+        if (state.currentPlayer.confirmedAttendanceIds.includes(recruitmentId)) return;
+        const updated: Player = {
+          ...state.currentPlayer,
+          confirmedAttendanceIds: [...state.currentPlayer.confirmedAttendanceIds, recruitmentId],
+        };
+        set({
+          currentPlayer: updated,
+          players: state.players.map((p) => (p.id === updated.id ? updated : p)),
+        });
+      },
+
+      hasConfirmedAttendance: (playerId, recruitmentId) => {
+        const player = get().players.find((p) => p.id === playerId);
+        if (!player) return false;
+        return player.confirmedAttendanceIds.includes(recruitmentId);
       },
 
       getRecruitmentById: (id) => get().recruitments.find((r) => r.id === id),

@@ -39,11 +39,30 @@ export default function CreateRecruitment() {
       setDescription(createDraft.description);
       setCreateDraft(null);
     }
-  }, []);
+  }, [createDraft, setCreateDraft]);
+
+  const handleGoCreateProfile = () => {
+    setCreateDraft({
+      scriptName,
+      difficulty,
+      totalPlayers,
+      currentPlayers,
+      store,
+      driveTime,
+      missingRoles,
+      requireFastReading,
+      acceptSubstitute,
+      description,
+    });
+    navigate('/profile/edit', { state: { from: location.pathname } });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPlayer) return;
+    if (!currentPlayer) {
+      handleGoCreateProfile();
+      return;
+    }
     createRecruitment({
       scriptName,
       difficulty,
@@ -60,51 +79,6 @@ export default function CreateRecruitment() {
     navigate('/');
   };
 
-  if (!currentPlayer) {
-    return (
-      <div className="min-h-screen bg-noir">
-        <div className="flex items-center gap-3 p-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="rounded-lg p-2 text-ghost-dim transition-colors hover:bg-noir-surface hover:text-ghost"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="font-display text-2xl text-ghost">发车</h1>
-        </div>
-        <div className="mx-auto max-w-md px-6 pt-16 text-center">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-noir-surface">
-            <FileText size={32} className="text-amber/60" />
-          </div>
-          <h2 className="mb-2 font-display text-xl text-ghost">先创建你的推理档案</h2>
-          <p className="mb-6 text-sm text-ghost-dim">
-            作为车头需要先完善个人档案，让队友了解你的推理风格
-          </p>
-          <button
-            onClick={() => {
-              setCreateDraft({
-                scriptName,
-                difficulty,
-                totalPlayers,
-                currentPlayers,
-                store,
-                driveTime,
-                missingRoles,
-                requireFastReading,
-                acceptSubstitute,
-                description,
-              });
-              navigate('/profile/edit', { state: { from: location.pathname } });
-            }}
-            className="inline-flex items-center justify-center rounded-lg bg-amber px-8 py-3 text-sm font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
-          >
-            去创建档案
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-noir pb-24">
       <div className="flex items-center gap-3 p-4">
@@ -116,6 +90,29 @@ export default function CreateRecruitment() {
         </button>
         <h1 className="font-display text-2xl text-ghost">发车</h1>
       </div>
+
+      {!currentPlayer && (
+        <div className="mx-4 mb-4 rounded-xl border border-amber/30 bg-amber/10 p-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-noir-surface">
+              <FileText size={20} className="text-amber" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display text-base text-ghost">先创建你的推理档案</h3>
+              <p className="mt-1 text-sm text-ghost-dim">
+                作为车头需要先完善个人档案，让队友了解你的推理风格。你可以先填写下面的表单，创建档案后会自动恢复。
+              </p>
+              <button
+                type="button"
+                onClick={handleGoCreateProfile}
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-amber px-5 py-2 text-sm font-medium text-noir transition-all hover:bg-amber-light active:scale-[0.98]"
+              >
+                去创建档案
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-4">
         <FieldGroup label="剧本名称">
